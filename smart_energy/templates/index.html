@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Home Energy Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+<h1>⚡ Smart Home Energy Dashboard</h1>
+<button class="theme-btn" onclick="toggleTheme()">🌙 Toggle Theme</button>
+
+<div class="card main-card">
+    <h2>House Power</h2>
+    <div class="big-number">
+        <span id="power">0</span> W
+    </div>
+    <p>Predicted Next: <b><span id="predicted">0</span> W</b></p>
+    <div class="status" id="status">NORMAL</div>
+</div>
+
+<div class="analytics">
+    <div class="a-card blue">
+        Daily Energy
+        <h3><span id="dailyEnergy">0</span> kWh</h3>
+    </div>
+    <div class="a-card green">
+        Today’s Bill
+        <h3>₹ <span id="dailyCost">0</span></h3>
+    </div>
+    <div class="a-card purple">
+        Monthly Estimate
+        <h3>₹ <span id="monthlyCost">0</span></h3>
+    </div>
+</div>
+
+<h2>📈 Live Power Usage</h2>
+<canvas id="chart"></canvas>
+
+
+<h2>📋 Recent Records</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Power (W)</th>
+            <th>Energy (kWh)</th>
+            <th>Cost (₹)</th>
+        </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+</table>
+
+<script>
+let labels = [], actual = [], predicted = [];
+
+const chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: {
+        labels,
+        datasets: [{
+            label: "Power (W)",
+            data: actual,
+            borderColor: "#00ffcc",
+            backgroundColor: "rgba(0,255,204,0.2)",
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: { responsive: true, animation: false }
+});
+
+function updateData(){
+    fetch("/data").then(r=>r.json()).then(d=>{
+        power.innerText = d.current.total;
+        predicted.innerText = d.current.predicted;
+        dailyEnergy.innerText = d.analytics.daily_energy;
+        dailyCost.innerText = d.analytics.daily_cost;
+        monthlyCost.innerText = d.analytics.monthly_cost;
+
+        let s = "NORMAL";
+        status.className = "status normal";
+        if(d.current.total > 2000){ s="CRITICAL"; status.className="status critical"; }
+        else if(d.current.total > 1200){ s="HIGH"; status.className="status high"; }
+        status.innerText = s;
+
+        labels.push(d.current.time);
+        actual.push(d.current.total);
+        if(labels.length>10){ labels.shift(); actual.shift(); }
+        chart.update();
+
+        tableBody.innerHTML = d.history.slice().reverse().map(r=>`
+            <tr>
+                <td>${r.time}</td>
+                <td>${r.total}</td>
+                <td>${r.energy}</td>
+                <td>${r.cost}</td>
+            </tr>
+        `).join("");
+    });
+    energyLabels.push(d.current.time);
+energyData.push(d.current.energy);
+
+if (energyLabels.length > 10) {
+    energyLabels.shift();
+    energyData.shift();
+}
+
+energyChart.update();
+
+}
+
+setInterval(updateData,2000);
+updateData();
+function toggleTheme() {
+    document.body.classList.toggle("light");
+}
+let energyLabels = [];
+let energyData = [];
+
+const energyCtx = document.getElementById("energyChart").getContext("2d");
+
+const energyChart = new Chart(energyCtx, {
+    type: "bar",
+    data: {
+        labels: energyLabels,
+        datasets: [{
+            label: "Energy (kWh)",
+            data: energyData,
+            backgroundColor: "#00f2ff"
+        }]
+    },
+    options: {
+        responsive: true,
+        animation: false
+    }
+});
+
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Home Energy Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+<h1>Smart Home Energy Monitoring System</h1>
+
+<div class="card">
+    <h2>House Power: <span id="power">0</span> W</h2>
+    <h3>Predicted Next: <span id="predicted">0</span> W</h3>
+</div>
+
+<div class="analytics">
+    <div class="a-card">
+        Daily Energy<br>
+        <b><span id="dailyEnergy">0</span> kWh</b>
+    </div>
+    <div class="a-card">
+        Today’s Bill<br>
+        <b>₹ <span id="dailyCost">0</span></b>
+    </div>
+    <div class="a-card">
+        Monthly Estimate<br>
+        <b>₹ <span id="monthlyCost">0</span></b>
+    </div>
+</div>
+
+<h2>Live House Power Curve</h2>
+<canvas id="chart"></canvas>
+
+<h2>Last 10 Records</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Power (W)</th>
+            <th>Energy (kWh)</th>
+            <th>Cost (₹)</th>
+        </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+</table>
+
+<script>
+let labels = [];
+let actual = [];
+let predicted = [];
+
+const ctx = document.getElementById("chart").getContext("2d");
+
+const chart = new Chart(ctx, {
+    type: "line",
+    data: {
+        labels,
+        datasets: [
+            {
+                label: "Actual Power",
+                data: actual,
+                borderColor: "green",
+                backgroundColor: "rgba(0,128,0,0.15)",
+                fill: true,
+                tension: 0.4   // smooth curve
+            },
+            {
+                label: "Predicted Power",
+                data: predicted,
+                borderColor: "red",
+                borderDash: [5,5],
+                tension: 0.4
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        animation: false,
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+
+function updateData(){
+    fetch("/data")
+        .then(res => res.json())
+        .then(d => {
+            document.getElementById("power").innerText = d.current.total;
+            document.getElementById("predicted").innerText = d.current.predicted;
+
+            document.getElementById("dailyEnergy").innerText = d.analytics.daily_energy;
+            document.getElementById("dailyCost").innerText = d.analytics.daily_cost;
+            document.getElementById("monthlyCost").innerText = d.analytics.monthly_cost;
+
+            labels.push(d.current.time);
+            actual.push(d.current.total);
+            predicted.push(d.current.predicted);
+
+            if (labels.length > 10) {
+                labels.shift();
+                actual.shift();
+                predicted.shift();
+            }
+            chart.update();
+
+            let rows = "";
+            d.history.slice().reverse().forEach(r => {
+                rows += `
+                    <tr>
+                        <td>${r.time}</td>
+                        <td>${r.total}</td>
+                        <td>${r.energy}</td>
+                        <td>${r.cost}</td>
+                    </tr>`;
+            });
+            document.getElementById("tableBody").innerHTML = rows;
+        });
+}
+
+setInterval(updateData, 2000);
+updateData();
+</script>
+
+</body>
+</html>

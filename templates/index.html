@@ -9,7 +9,6 @@
 <body>
 
 <h1>⚡ Smart Home Energy Dashboard</h1>
-<button class="theme-btn" onclick="toggleTheme()">🌙 Toggle Theme</button>
 
 <div class="card main-card">
     <h2>House Power</h2>
@@ -17,7 +16,7 @@
         <span id="power">0</span> W
     </div>
     <p>Predicted Next: <b><span id="predicted">0</span> W</b></p>
-    <div class="status normal" id="status">NORMAL</div>
+    <div class="status" id="status">NORMAL</div>
 </div>
 
 <div class="analytics">
@@ -38,7 +37,7 @@
 <h2>📈 Live Power Usage</h2>
 <canvas id="powerChart"></canvas>
 
-<h2>⚡ Energy Consumption (kWh)</h2>
+<h2>⚡ Energy Consumption</h2>
 <canvas id="energyChart"></canvas>
 
 <h2>📋 Recent Records</h2>
@@ -61,118 +60,85 @@ let powerData = [];
 let energyLabels = [];
 let energyData = [];
 
-// POWER LINE CHART
-const powerChart = new Chart(
-    document.getElementById("powerChart"),
-    {
-        type: "line",
-        data: {
-            labels: powerLabels,
-            datasets: [{
-                label: "Power (W)",
-                data: powerData,
-                borderColor: "#00ffcc",
-                backgroundColor: "rgba(0,255,204,0.2)",
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            animation: false
-        }
-    }
-);
+const powerChart = new Chart(document.getElementById("powerChart"), {
+    type: "line",
+    data: {
+        labels: powerLabels,
+        datasets: [{
+            label: "Power (W)",
+            data: powerData,
+            borderColor: "#00ffcc",
+            backgroundColor: "rgba(0,255,204,0.2)",
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: { responsive: true, animation: false }
+});
 
-// ENERGY BAR CHART
-const energyChart = new Chart(
-    document.getElementById("energyChart"),
-    {
-        type: "bar",
-        data: {
-            labels: energyLabels,
-            datasets: [{
-                label: "Energy (kWh)",
-                data: energyData,
-                backgroundColor: "#00f2ff"
-            }]
-        },
-        options: {
-            responsive: true,
-            animation: false
-        }
-    }
-);
+const energyChart = new Chart(document.getElementById("energyChart"), {
+    type: "bar",
+    data: {
+        labels: energyLabels,
+        datasets: [{
+            label: "Energy (kWh)",
+            data: energyData,
+            backgroundColor: "#00c6ff"
+        }]
+    },
+    options: { responsive: true, animation: false }
+});
 
-function updateData() {
+function updateData(){
     fetch("/data")
-        .then(res => res.json())
-        .then(d => {
+    .then(r => r.json())
+    .then(d => {
 
-            // Update main values
-            document.getElementById("power").innerText = d.current.total;
-            document.getElementById("predicted").innerText = d.current.predicted;
-            document.getElementById("dailyEnergy").innerText = d.analytics.daily_energy;
-            document.getElementById("dailyCost").innerText = d.analytics.daily_cost;
-            document.getElementById("monthlyCost").innerText = d.analytics.monthly_cost;
+        power.innerText = d.current.total;
+        predicted.innerText = d.current.predicted;
+        dailyEnergy.innerText = d.analytics.daily_energy;
+        dailyCost.innerText = d.analytics.daily_cost;
+        monthlyCost.innerText = d.analytics.monthly_cost;
 
-            // Status logic
-            let statusText = "NORMAL";
-            let status = document.getElementById("status");
-            status.className = "status normal";
+        // Status
+        let s = "NORMAL";
+        status.className = "status normal";
+        if(d.current.total > 2000){ s="CRITICAL"; status.className="status critical"; }
+        else if(d.current.total > 1200){ s="HIGH"; status.className="status high"; }
+        status.innerText = s;
 
-            if (d.current.total > 2000) {
-                statusText = "CRITICAL";
-                status.className = "status critical";
-            } 
-            else if (d.current.total > 1200) {
-                statusText = "HIGH";
-                status.className = "status high";
-            }
+        // Power Chart
+        powerLabels.push(d.current.time);
+        powerData.push(d.current.total);
+        if(powerLabels.length > 10){
+            powerLabels.shift();
+            powerData.shift();
+        }
+        powerChart.update();
 
-            status.innerText = statusText;
+        // Energy Chart
+        energyLabels.push(d.current.time);
+        energyData.push(d.current.energy);
+        if(energyLabels.length > 10){
+            energyLabels.shift();
+            energyData.shift();
+        }
+        energyChart.update();
 
-            // Update Power Chart
-            powerLabels.push(d.current.time);
-            powerData.push(d.current.total);
-
-            if (powerLabels.length > 10) {
-                powerLabels.shift();
-                powerData.shift();
-            }
-
-            powerChart.update();
-
-            // Update Energy Chart
-            energyLabels.push(d.current.time);
-            energyData.push(d.current.energy);
-
-            if (energyLabels.length > 10) {
-                energyLabels.shift();
-                energyData.shift();
-            }
-
-            energyChart.update();
-
-            // Update table
-            document.getElementById("tableBody").innerHTML =
-                d.history.slice().reverse().map(r => `
-                    <tr>
-                        <td>${r.time}</td>
-                        <td>${r.total}</td>
-                        <td>${r.energy}</td>
-                        <td>${r.cost}</td>
-                    </tr>
-                `).join("");
-        });
+        // Table
+        tableBody.innerHTML = d.history.slice().reverse().map(r => `
+            <tr>
+                <td>${r.time}</td>
+                <td>${r.power}</td>
+                <td>${r.energy}</td>
+                <td>${r.cost}</td>
+            </tr>
+        `).join("");
+    });
 }
 
 setInterval(updateData, 2000);
 updateData();
-
-function toggleTheme() {
-    document.body.classList.toggle("light");
-}
 </script>
 
 </body>

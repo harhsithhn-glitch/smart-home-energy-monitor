@@ -1,0 +1,4 @@
+energy.db
+energy_report.csv
+__pycache__/
+*.pyc

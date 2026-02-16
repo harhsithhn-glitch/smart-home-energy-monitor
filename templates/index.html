@@ -9,7 +9,9 @@
 <body>
 
 <h1>⚡ Smart Home Energy Dashboard</h1>
-<button class="theme-btn" onclick="toggleTheme()">🌙 Toggle Theme</button>
+
+<button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
+<a href="/export"><button class="theme-btn">Export CSV</button></a>
 
 <div class="card main-card">
     <h2>House Power</h2>
@@ -17,9 +19,20 @@
         <span id="power">0</span> W
     </div>
     <p>Predicted Next: <b><span id="predicted">0</span> W</b></p>
-    <div class="status normal" id="status">NORMAL</div>
+    <div class="status" id="status">NORMAL</div>
 </div>
 
+<!-- DEVICE BREAKDOWN -->
+<h2>🏠 Device Breakdown</h2>
+<div class="analytics">
+    <div class="a-card blue">Fan <h3><span id="fan">0</span> W</h3></div>
+    <div class="a-card green">AC <h3><span id="ac">0</span> W</h3></div>
+    <div class="a-card purple">TV <h3><span id="tv">0</span> W</h3></div>
+    <div class="a-card blue">Fridge <h3><span id="fridge">0</span> W</h3></div>
+</div>
+
+<!-- ANALYTICS -->
+<h2>📊 Analytics</h2>
 <div class="analytics">
     <div class="a-card blue">
         Daily Energy
@@ -36,10 +49,7 @@
 </div>
 
 <h2>📈 Live Power Usage</h2>
-<canvas id="powerChart"></canvas>
-
-<h2>⚡ Energy Consumption (kWh)</h2>
-<canvas id="energyChart"></canvas>
+<canvas id="chart"></canvas>
 
 <h2>📋 Recent Records</h2>
 <table>
@@ -55,122 +65,80 @@
 </table>
 
 <script>
-let powerLabels = [];
-let powerData = [];
+let labels = [], actual = [];
 
-let energyLabels = [];
-let energyData = [];
+const chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: {
+        labels,
+        datasets: [{
+            label: "Power (W)",
+            data: actual,
+            borderColor: "#00ffcc",
+            backgroundColor: "rgba(0,255,204,0.2)",
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: { responsive: true, animation: false }
+});
 
-// POWER LINE CHART
-const powerChart = new Chart(
-    document.getElementById("powerChart"),
-    {
-        type: "line",
-        data: {
-            labels: powerLabels,
-            datasets: [{
-                label: "Power (W)",
-                data: powerData,
-                borderColor: "#00ffcc",
-                backgroundColor: "rgba(0,255,204,0.2)",
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            animation: false
-        }
-    }
-);
-
-// ENERGY BAR CHART
-const energyChart = new Chart(
-    document.getElementById("energyChart"),
-    {
-        type: "bar",
-        data: {
-            labels: energyLabels,
-            datasets: [{
-                label: "Energy (kWh)",
-                data: energyData,
-                backgroundColor: "#00f2ff"
-            }]
-        },
-        options: {
-            responsive: true,
-            animation: false
-        }
-    }
-);
-
-function updateData() {
+function updateData(){
     fetch("/data")
-        .then(res => res.json())
-        .then(d => {
+    .then(r=>r.json())
+    .then(d=>{
 
-            // Update main values
-            document.getElementById("power").innerText = d.current.total;
-            document.getElementById("predicted").innerText = d.current.predicted;
-            document.getElementById("dailyEnergy").innerText = d.analytics.daily_energy;
-            document.getElementById("dailyCost").innerText = d.analytics.daily_cost;
-            document.getElementById("monthlyCost").innerText = d.analytics.monthly_cost;
+        power.innerText = d.current.total;
+        predicted.innerText = d.current.predicted;
 
-            // Status logic
-            let statusText = "NORMAL";
-            let status = document.getElementById("status");
-            status.className = "status normal";
+        fan.innerText = d.current.fan;
+        ac.innerText = d.current.ac;
+        tv.innerText = d.current.tv;
+        fridge.innerText = d.current.fridge;
 
-            if (d.current.total > 2000) {
-                statusText = "CRITICAL";
-                status.className = "status critical";
-            } 
-            else if (d.current.total > 1200) {
-                statusText = "HIGH";
-                status.className = "status high";
-            }
+        dailyEnergy.innerText = d.analytics.daily_energy;
+        dailyCost.innerText = d.analytics.daily_cost;
+        monthlyCost.innerText = d.analytics.monthly_cost;
 
-            status.innerText = statusText;
+        let s = "NORMAL";
+        status.className = "status normal";
 
-            // Update Power Chart
-            powerLabels.push(d.current.time);
-            powerData.push(d.current.total);
+        if(d.current.total > 2500){
+            s="CRITICAL";
+            status.className="status critical";
+        }
+        else if(d.current.total > 1500){
+            s="HIGH";
+            status.className="status high";
+        }
 
-            if (powerLabels.length > 10) {
-                powerLabels.shift();
-                powerData.shift();
-            }
+        status.innerText = s;
 
-            powerChart.update();
+        labels.push(d.current.time);
+        actual.push(d.current.total);
 
-            // Update Energy Chart
-            energyLabels.push(d.current.time);
-            energyData.push(d.current.energy);
+        if(labels.length>10){
+            labels.shift();
+            actual.shift();
+        }
 
-            if (energyLabels.length > 10) {
-                energyLabels.shift();
-                energyData.shift();
-            }
+        chart.update();
 
-            energyChart.update();
-
-            // Update table
-            document.getElementById("tableBody").innerHTML =
-                d.history.slice().reverse().map(r => `
-                    <tr>
-                        <td>${r.time}</td>
-                        <td>${r.total}</td>
-                        <td>${r.energy}</td>
-                        <td>${r.cost}</td>
-                    </tr>
-                `).join("");
-        });
+        tableBody.innerHTML = d.history.slice().reverse().map(r=>`
+            <tr>
+                <td>${r.time}</td>
+                <td>${r.total}</td>
+                <td>${r.energy}</td>
+                <td>${r.cost}</td>
+            </tr>
+        `).join("");
+    });
 }
 
-setInterval(updateData, 2000);
+setInterval(updateData,2000);
 updateData();
 
-function toggleTheme() {
+function toggleTheme(){
     document.body.classList.toggle("light");
 }
 </script>
